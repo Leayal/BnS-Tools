@@ -41,10 +41,6 @@
     <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Leayal.Core">
-      <HintPath>..\..\Leayal Shared Codes\Leayal.Core\bin\Release\Leayal.Core.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="Microsoft.VisualBasic" />
     <Reference Include="System" />
     <Reference Include="Microsoft.CSharp" />
@@ -83,6 +79,13 @@
     <EmbeddedResource Include="Dlls\Leayal.Core.dll" />
     <EmbeddedResource Include="Dlls\Microsoft.IO.RecyclableMemoryStream.dll" />
     <Content Include="icon.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Leayal.Core\Leayal.Core.csproj">
+      <Project>{3dcd41bd-c295-4bd1-b675-aedc9fcbfa1a}</Project>
+      <Name>Leayal.Core</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

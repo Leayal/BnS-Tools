@@ -1,0 +1,3 @@
+[submodule "Leayal.Core"]
+	path = Leayal.Core
+	url = https://github.com/Leayal/Leayal.Core.git

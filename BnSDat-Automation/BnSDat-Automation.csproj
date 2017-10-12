@@ -37,11 +37,6 @@
     <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Leayal.Core, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\Leayal Shared Codes\Leayal.Core\bin\Release\Leayal.Core.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="Microsoft.IO.RecyclableMemoryStream, Version=1.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.IO.RecyclableMemoryStream.1.2.2\lib\net40\Microsoft.IO.RecyclableMemoryStream.dll</HintPath>
       <Private>False</Private>
@@ -91,6 +86,11 @@
     <ProjectReference Include="..\BnS-Dat\BnS-Dat.csproj">
       <Project>{67203921-32c0-4fd3-a123-918c1fe85a3b}</Project>
       <Name>BnS-Dat</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Leayal.Core\Leayal.Core.csproj">
+      <Project>{3dcd41bd-c295-4bd1-b675-aedc9fcbfa1a}</Project>
+      <Name>Leayal.Core</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>

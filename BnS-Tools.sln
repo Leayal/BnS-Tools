@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BnS-Dat", "BnS-Dat\BnS-Dat.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BnSDat-Automation", "BnSDat-Automation\BnSDat-Automation.csproj", "{4F179EB9-1FA2-4416-A549-190979CC438B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Leayal.Core", "Leayal.Core\Leayal.Core.csproj", "{3DCD41BD-C295-4BD1-B675-AEDC9FCBFA1A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,6 +28,10 @@ Global
 		{4F179EB9-1FA2-4416-A549-190979CC438B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4F179EB9-1FA2-4416-A549-190979CC438B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4F179EB9-1FA2-4416-A549-190979CC438B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3DCD41BD-C295-4BD1-B675-AEDC9FCBFA1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3DCD41BD-C295-4BD1-B675-AEDC9FCBFA1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3DCD41BD-C295-4BD1-B675-AEDC9FCBFA1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3DCD41BD-C295-4BD1-B675-AEDC9FCBFA1A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
