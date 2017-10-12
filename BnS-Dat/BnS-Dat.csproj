@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{67203921-32C0-4FD3-A123-918C1FE85A3B}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>BnSDat</RootNamespace>
+    <AssemblyName>BnS-Dat</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>
+    </DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Leayal.Core">
+      <HintPath>..\..\Leayal Shared Codes\Leayal.Core\bin\Release\Leayal.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.IO.RecyclableMemoryStream, Version=1.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.IO.RecyclableMemoryStream.1.2.2\lib\net40\Microsoft.IO.RecyclableMemoryStream.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BnSDatArchive.cs" />
+    <Compile Include="BnSDatReader.cs" />
+    <Compile Include="FilepathInsideArchive.cs" />
+    <Compile Include="BnSDatWriter.cs" />
+    <Compile Include="BPKG_FTE.cs" />
+    <Compile Include="BXML.cs" />
+    <Compile Include="BXML_CONTENT.cs" />
+    <Compile Include="ProgressEventArgs.cs" />
+    <Compile Include="RijndaelStream.cs" />
+    <Compile Include="WriteArchiveEventArgs.cs" />
+    <Compile Include="Zlib\CompressionMode.cs" />
+    <Compile Include="Zlib\Crc32.cs" />
+    <Compile Include="Zlib\DataConverter.cs" />
+    <Compile Include="Zlib\DeflateManager.cs" />
+    <Compile Include="Zlib\FlushType.cs" />
+    <Compile Include="Zlib\Inflate.cs" />
+    <Compile Include="Zlib\Inftree.cs" />
+    <Compile Include="Zlib\TarHeader.cs" />
+    <Compile Include="Zlib\Tree.cs" />
+    <Compile Include="Zlib\Zlib.cs" />
+    <Compile Include="Zlib\ZlibBaseStream.cs" />
+    <Compile Include="Zlib\ZlibCodec.cs" />
+    <Compile Include="Zlib\ZlibConstants.cs" />
+    <Compile Include="Zlib\ZlibStream.cs" />
+    <None Include="BNSDat_source.cs" />
+    <Compile Include="EntryExtractingEventArgs.cs" />
+    <Compile Include="EntryStream.cs" />
+    <Compile Include="Enums.cs" />
+    <Compile Include="IReader.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
