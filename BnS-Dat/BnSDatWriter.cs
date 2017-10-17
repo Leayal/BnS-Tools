@@ -223,7 +223,7 @@ namespace BnSDat
                     currentprocessingEntry = entryList[i];
                     currentProcessingStream = this.currentContents[currentprocessingEntry];
                     currentProcessingStream.Seek(0, SeekOrigin.Begin);
-                    this.StreamCopyChunk(currentProcessingStream, bw.BaseStream, 4096);
+                    CommonMethods.StreamCopyChunk(currentProcessingStream, bw.BaseStream, 4096);
                 }
                 bw.BaseStream.Flush();
             }
@@ -284,7 +284,7 @@ namespace BnSDat
                 {
                     // compress raw
                     // FileTableEntry.FileDataOffset = (int)mosFiles.BaseStream.Position;
-                    this.StreamCopyChunk(content, tmp, 1024);
+                    CommonMethods.StreamCopyChunk(content, tmp, 1024);
 
                     FileTableEntry.FileDataSizeUnpacked = (int)content.Length;
 
@@ -341,7 +341,7 @@ namespace BnSDat
                 {
                     // compress raw
                     // FileTableEntry.FileDataOffset = (int)mosFiles.BaseStream.Position;
-                    this.StreamCopyChunk(content, tmp, 1024);
+                    CommonMethods.StreamCopyChunk(content, tmp, 1024);
 
                     FileTableEntry.FileDataSizeUnpacked = (int)content.Length;
 
@@ -359,7 +359,7 @@ namespace BnSDat
         internal void AddNewEntry(Entry entry, Stream content)
         {
             Stream contentStream = this.CreateTempStream(this.TemporaryFolder);
-            this.StreamCopyChunk(content, contentStream, 4096);
+            CommonMethods.StreamCopyChunk(content, contentStream, 4096);
             this.currentItems.Add(entry.FilePath, entry);
             this.currentContents.Add(entry, contentStream);
         }
@@ -395,19 +395,6 @@ namespace BnSDat
         {
             foreach (var keypair in filelist)
                 this.CompressFile(keypair.Key, keypair.Value);
-        }
-
-        private void StreamCopyChunk(Stream source, Stream destination, int buffersize)
-        {
-            using (Leayal.ByteBuffer buffer = new Leayal.ByteBuffer(buffersize))
-            {
-                int read = source.Read(buffer, 0, buffer.Length);
-                while (read > 0)
-                {
-                    destination.Write(buffer, 0, read);
-                    read = source.Read(buffer, 0, buffer.Length);
-                }
-            }
         }
         
         private RecyclableMemoryStream Inflate(byte[] buffer, long bufferlength, int sizeDecompressed, out int sizeCompressed, CompressionLevel compressionLevel)

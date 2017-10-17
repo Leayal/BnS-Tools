@@ -145,87 +145,131 @@ namespace BnSLaunchWrapper
                             {
                                 if (config.GetValue("Mods", "enable xml.dat swap", "0") != "0")
                                     if (!string.IsNullOrWhiteSpace(xml_ori) && File.Exists(xml_ori))
-                                        if (!string.IsNullOrWhiteSpace(xml_modded) && File.Exists(xml_modded))
+                                        if (!string.IsNullOrWhiteSpace(xml_modded))
                                         {
                                             xml_ori = Path.GetFullPath(xml_ori);
                                             xml_modded = Path.GetFullPath(xml_modded);
-                                            bool safetoswap = false;
 
-                                            if (swap_ignorewarning)
-                                                safetoswap = true;
-                                            else
-                                            {
-                                                string currenthash = Leayal.Security.Cryptography.SHA256Wrapper.FromFile(xml_ori);
-                                                if (string.IsNullOrWhiteSpace(original_hash))
+                                            bool xml_modded_exist = File.Exists(xml_modded),
+                                                patcher_path_exist = File.Exists(patcher_path),
+                                                patcher_pathinfo_exist = Directory.Exists(patcher_pathinfo),
+                                                patcher_pathinfo_empty = patcher_pathinfo_exist ? Leayal.IO.DirectoryHelper.IsFolderEmpty(patcher_pathinfo) : true,
+                                                safetoswap = false;
+                                            string currenthash = null;
+
+                                            if (!xml_modded_exist)
+                                                if (patcher_path_exist && patcher_pathinfo_exist && !patcher_pathinfo_empty)
                                                 {
-                                                    config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
-                                                    safetoswap = true;
-                                                }
-                                                else
-                                                {
-                                                    if (currenthash.IsEqual(original_hash, true))
-                                                        safetoswap = true;
-                                                    else
+                                                    if (MessageBox.Show(this.GetWrapperForm(), "The modded xml.dat has not been created yet. Do you want to create it?", "Question", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
                                                     {
-                                                        // Throw warning and exit.
-                                                        this._wrapperform.Show();
-
-                                                        bool patchsuccess = false;
-                                                        if (File.Exists(patcher_path) && Directory.Exists(patcher_pathinfo))
+                                                        using (Process patchingProc = new Process())
                                                         {
-                                                            if (MessageBox.Show(this.GetWrapperForm(), "The original xml.dat has been changed. Do you want to patch it?", "Question", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+                                                            patchingProc.StartInfo.FileName = patcher_path;
+                                                            List<string> paramList = new List<string>(5);
+                                                            paramList.Add("-p");
+                                                            paramList.Add(xml_ori);
+                                                            paramList.Add(xml_modded);
+                                                            paramList.Add(patcher_pathinfo);
+                                                            if (!string.IsNullOrWhiteSpace(patcher_workingdir))
                                                             {
-                                                                using (Process patchingProc = new Process())
-                                                                {
-                                                                    patchingProc.StartInfo.FileName = patcher_path;
-                                                                    List<string> paramList = new List<string>(5);
-                                                                    paramList.Add("-p");
-                                                                    paramList.Add(xml_ori);
-                                                                    paramList.Add(xml_modded);
-                                                                    paramList.Add(patcher_pathinfo);
-                                                                    if (!string.IsNullOrWhiteSpace(patcher_workingdir))
-                                                                    {
-                                                                        Microsoft.VisualBasic.FileIO.FileSystem.CreateDirectory(patcher_workingdir);
-                                                                        paramList.Add(patcher_workingdir);
-                                                                    }
-                                                                    patchingProc.StartInfo.Arguments = ProcessHelper.TableStringToArgs(paramList);
-
-                                                                    patchingProc.Start();
-                                                                    patchingProc.WaitForExit();
-                                                                    if (patchingProc.ExitCode == 0)
-                                                                    {
-                                                                        config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
-                                                                        safetoswap = true;
-                                                                        patchsuccess = true;
-                                                                    }
-                                                                }
+                                                                Microsoft.VisualBasic.FileIO.FileSystem.CreateDirectory(patcher_workingdir);
+                                                                paramList.Add(patcher_workingdir);
                                                             }
-                                                        }
+                                                            patchingProc.StartInfo.Arguments = ProcessHelper.TableStringToArgs(paramList);
 
-                                                        if (!patchsuccess)
-                                                        {
-                                                            if (MessageBox.Show(this.GetWrapperForm(), "The original xml.dat has been changed. You should rebuild/update your modded xml.dat file, otherwise unexpected results may happen.\nIgnore hash check for current version and continue?", "Warning", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+                                                            patchingProc.Start();
+                                                            patchingProc.WaitForExit();
+                                                            if (patchingProc.ExitCode == 0)
                                                             {
+                                                                if (string.IsNullOrEmpty(currenthash))
+                                                                    currenthash = Leayal.Security.Cryptography.SHA256Wrapper.HashFromFile(xml_ori);
                                                                 config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
                                                                 safetoswap = true;
+                                                                xml_modded_exist = true;
                                                             }
-                                                            else
-                                                                this.ExitProgram(1);
                                                         }
                                                     }
                                                 }
-                                            }
 
-                                            if (safetoswap)
+                                            if (xml_modded_exist)
                                             {
-                                                swapFileResult = SwapFile(xml_ori, xml_modded, Path.ChangeExtension(xml_ori, ".original"));
-                                                if (swapFileResult.Error == null)
-                                                    swapfile_swapped = true;
+                                                if (swap_ignorewarning)
+                                                    safetoswap = true;
                                                 else
                                                 {
-                                                    this._wrapperform.Show();
-                                                    if (MessageBox.Show(this.GetWrapperForm(), "An error has been occured. Start game anyway???\nError detail: " + swapFileResult.Error.ToString(), "Error while swapping file.", MessageBoxButtons.YesNo, MessageBoxIcon.Error) != DialogResult.Yes)
-                                                        this.ExitProgram(2);
+                                                    if (string.IsNullOrEmpty(currenthash))
+                                                        currenthash = Leayal.Security.Cryptography.SHA256Wrapper.HashFromFile(xml_ori);
+                                                    if (string.IsNullOrWhiteSpace(original_hash))
+                                                    {
+                                                        config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
+                                                        safetoswap = true;
+                                                    }
+                                                    else
+                                                    {
+                                                        if (currenthash.IsEqual(original_hash, true))
+                                                            safetoswap = true;
+                                                        else
+                                                        {
+                                                            // Throw warning and exit.
+                                                            this._wrapperform.Show();
+
+                                                            bool patchsuccess = false;
+                                                            if (patcher_path_exist && patcher_pathinfo_exist && !patcher_pathinfo_empty)
+                                                            {
+                                                                if (MessageBox.Show(this.GetWrapperForm(), "The original xml.dat has been changed. Do you want to patch it?", "Question", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+                                                                {
+                                                                    using (Process patchingProc = new Process())
+                                                                    {
+                                                                        patchingProc.StartInfo.FileName = patcher_path;
+                                                                        List<string> paramList = new List<string>(5);
+                                                                        paramList.Add("-p");
+                                                                        paramList.Add(xml_ori);
+                                                                        paramList.Add(xml_modded);
+                                                                        paramList.Add(patcher_pathinfo);
+                                                                        if (!string.IsNullOrWhiteSpace(patcher_workingdir))
+                                                                        {
+                                                                            Microsoft.VisualBasic.FileIO.FileSystem.CreateDirectory(patcher_workingdir);
+                                                                            paramList.Add(patcher_workingdir);
+                                                                        }
+                                                                        patchingProc.StartInfo.Arguments = ProcessHelper.TableStringToArgs(paramList);
+
+                                                                        patchingProc.Start();
+                                                                        patchingProc.WaitForExit();
+                                                                        if (patchingProc.ExitCode == 0)
+                                                                        {
+                                                                            config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
+                                                                            safetoswap = true;
+                                                                            patchsuccess = true;
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            if (!patchsuccess)
+                                                            {
+                                                                if (MessageBox.Show(this.GetWrapperForm(), "The original xml.dat has been changed. You should rebuild/update your modded xml.dat file, otherwise unexpected results may happen.\nIgnore hash check for current version and continue?", "Warning", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+                                                                {
+                                                                    config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
+                                                                    safetoswap = true;
+                                                                }
+                                                                else
+                                                                    this.ExitProgram(1);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                if (safetoswap)
+                                                {
+                                                    swapFileResult = SwapFile(xml_ori, xml_modded, Path.ChangeExtension(xml_ori, ".original"));
+                                                    if (swapFileResult.Error == null)
+                                                        swapfile_swapped = true;
+                                                    else
+                                                    {
+                                                        this._wrapperform.Show();
+                                                        if (MessageBox.Show(this.GetWrapperForm(), "An error has been occured. Start game anyway???\nError detail: " + swapFileResult.Error.ToString(), "Error while swapping file.", MessageBoxButtons.YesNo, MessageBoxIcon.Error) != DialogResult.Yes)
+                                                            this.ExitProgram(2);
+                                                    }
                                                 }
                                             }
                                         }

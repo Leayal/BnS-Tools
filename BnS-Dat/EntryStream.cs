@@ -46,7 +46,17 @@ namespace BnSDat
 
         public override long Seek(long offset, SeekOrigin origin)
         {
-            return this.Basestream.Seek(offset, origin);
+            switch (origin)
+            {
+                case SeekOrigin.Begin:
+                    return this.Basestream.Seek(this._offset + offset, origin);
+                case SeekOrigin.Current:
+                    return this.Basestream.Seek(offset, origin);
+                case SeekOrigin.End:
+                    return this.Basestream.Seek(offset, origin);
+                default:
+                    return this.Position;
+            }
         }
 
         public override void SetLength(long value)

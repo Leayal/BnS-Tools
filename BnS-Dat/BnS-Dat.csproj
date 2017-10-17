@@ -50,6 +50,7 @@
   <ItemGroup>
     <Compile Include="BnSDatArchive.cs" />
     <Compile Include="BnSDatReader.cs" />
+    <Compile Include="CommonMethods.cs" />
     <Compile Include="FilepathInsideArchive.cs" />
     <Compile Include="BnSDatWriter.cs" />
     <Compile Include="BPKG_FTE.cs" />
@@ -72,7 +73,6 @@
     <Compile Include="Zlib\ZlibCodec.cs" />
     <Compile Include="Zlib\ZlibConstants.cs" />
     <Compile Include="Zlib\ZlibStream.cs" />
-    <None Include="BNSDat_source.cs" />
     <Compile Include="EntryExtractingEventArgs.cs" />
     <Compile Include="EntryStream.cs" />
     <Compile Include="Enums.cs" />

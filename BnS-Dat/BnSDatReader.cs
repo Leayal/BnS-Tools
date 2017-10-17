@@ -92,6 +92,7 @@ namespace BnSDat
         {
             this._archive.OriginalStream.Position = fileTableEntry.FileDataOffset;
             Stream tmpStream = null;
+            
             if (!fileTableEntry.IsCompressed && !fileTableEntry.IsEncrypted)
             {
                 if (fileTableEntry.FileDataSizeSheared < fileTableEntry.FileDataSizeUnpacked)
@@ -106,20 +107,19 @@ namespace BnSDat
                     tmpStream = new RecyclableMemoryStream() { Capacity = fileTableEntry.FileDataSizeUnpacked };
                     for (int i = 0; i < fileTableEntry.FileDataSizeStored; i++)
                         packed.WriteByte(this._archive.BinaryReader.ReadByte());
-                    packed.Position = 0;
+                    packed.Seek(0, SeekOrigin.Begin); 
                     this.Unpack(packed, tmpStream, fileTableEntry.FileDataSizeStored, fileTableEntry.FileDataSizeSheared, fileTableEntry.FileDataSizeUnpacked, fileTableEntry.IsEncrypted, fileTableEntry.IsCompressed);
-                    tmpStream.Position = 0;
+                    tmpStream.Seek(0, SeekOrigin.Begin);
                 }
             }
 
             if (this.Entry.FilePath.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) || this.Entry.FilePath.EndsWith("x16", StringComparison.OrdinalIgnoreCase))
             {
                 // decode bxml
-                Leayal.IO.RecyclableMemoryStream temp = new Leayal.IO.RecyclableMemoryStream();
+                RecyclableMemoryStream temp = new RecyclableMemoryStream();
                 BXML bns_xml = new BXML(BXML.XOR_KEY_Data);
                 BXML.Convert(tmpStream, bns_xml.DetectType(tmpStream), temp, BXML_TYPE.BXML_PLAIN);
-                tmpStream.Dispose();
-                temp.Position = 0;
+                temp.Seek(0, SeekOrigin.Begin);
                 tmpStream = temp;
             }
 
