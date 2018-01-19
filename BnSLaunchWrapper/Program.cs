@@ -8,6 +8,7 @@ using Microsoft.VisualBasic.ApplicationServices;
 using System.Linq;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace BnSLaunchWrapper
 {
@@ -30,12 +31,23 @@ namespace BnSLaunchWrapper
 
         private class ConsoleController : WindowsFormsApplicationBase
         {
+            private string optLoading_from, optLoading_to;
+            private bool keeprunning, swapfile_swapped, optimizeLoading;
             private static Leayal.Ini.IniFile config;
+            private DiscordRPC.EventHandlers handlers;
+            private DiscordRPC.RichPresence cacheRP;
+            private bool enableDiscordRP;
+            private SwapFileResult swapFileResult;
+            private List<string> filelist;
+            private Process gameProcess;
 
             public ConsoleController() : base(AuthenticationMode.Windows)
             {
+                this.filelist = null;
+                this.swapFileResult = null;
                 this.EnableVisualStyles = false;
-                this.IsSingleInstance = false;
+                this.IsSingleInstance = true;
+                this.ShutdownStyle = ShutdownMode.AfterMainFormCloses;
             }
 
             protected override bool OnStartup(StartupEventArgs eventArgs)
@@ -73,6 +85,9 @@ namespace BnSLaunchWrapper
                         config.SetValue("Optimize Loading", "GameFolder", string.Empty);
                         config.SetValue("Optimize Loading", "BackupFolder", string.Empty);
                         config.SetValue("Optimize Loading", "Files", "00009368.upk;Loading.pkg");
+
+                        config.SetValue("DiscordApp", "Enable Rich Presence", "0");
+                        config.SetValue("DiscordApp", "ClientID", string.Empty);
                     }
 
                     List<string> cmdlines = new List<string>(eventArgs.CommandLine);
@@ -110,251 +125,250 @@ namespace BnSLaunchWrapper
                             strBuilder.Append(configArgs);
                         }
 
-                        using (Process proc = new Process()
+                        this.gameProcess = new Process()
                         {
                             StartInfo = new ProcessStartInfo()
                             {
                                 Arguments = strBuilder.ToString(),
                                 FileName = fullexepath,
                                 Verb = "runas"
-                            },
-                            EnableRaisingEvents = false
-                        })
+                            }
+                        };
+                        keeprunning = (config.GetValue("Wrapper", "bKeepRunning", "0") != "0");
+                        optimizeLoading = (config.GetValue("Mods", "Optimize loading", "0") != "0");
+                        bool swap_ignorewarning = (config.GetValue("xml.dat swap", "ignore warning", "0") != "0"),
+                            autopatching = (config.GetValue("Mods", "Enable xml.dat auto-patching", "0") != "0"),
+                            discord_enableRP = (config.GetValue("DiscordApp", "Enable Rich Presence", "0") != "0");
+                        optLoading_from = config.GetValue("Optimize Loading", "GameFolder", string.Empty);
+                        optLoading_to = config.GetValue("Optimize Loading", "BackupFolder", string.Empty);
+                        string xml_ori = config.GetValue("xml.dat swap", "original xml.dat", string.Empty),
+                            xml_modded = config.GetValue("xml.dat swap", "modded xml.dat", string.Empty),
+                            original_hash = config.GetValue("xml.dat swap", "original sha256 hash", string.Empty),
+
+                            optLoading_filelist = config.GetValue("Optimize Loading", "Files", string.Empty),
+
+                            patcher_path = config.GetValue("xml.dat patching", "patcher path", string.Empty),
+                            patcher_pathinfo = config.GetValue("xml.dat patching", "patch info folder", string.Empty),
+                            patcher_workingdir = config.GetValue("xml.dat patching", "working directory", string.Empty),
+
+                            discord_clientID = config.GetValue("DiscordApp", "ClientID", string.Empty);
+
+                        if (keeprunning)
                         {
-                            bool keeprunning = (config.GetValue("Wrapper", "bKeepRunning", "0") != "0"),
-                                swap_ignorewarning = (config.GetValue("xml.dat swap", "ignore warning", "0") != "0"),
-                                swapfile_swapped = false,
-                                optimizeLoading = (config.GetValue("Mods", "Optimize loading", "0") != "0"),
-                                autopatching = (config.GetValue("Mods", "Enable xml.dat auto-patching", "0") != "0");
-                            string xml_ori = config.GetValue("xml.dat swap", "original xml.dat", string.Empty),
-                                xml_modded = config.GetValue("xml.dat swap", "modded xml.dat", string.Empty),
-                                original_hash = config.GetValue("xml.dat swap", "original sha256 hash", string.Empty),
+                            if (config.GetValue("Mods", "enable xml.dat swap", "0") != "0")
+                                if (!string.IsNullOrWhiteSpace(xml_ori) && File.Exists(xml_ori))
+                                    if (!string.IsNullOrWhiteSpace(xml_modded))
+                                    {
+                                        xml_ori = Path.GetFullPath(xml_ori);
+                                        xml_modded = Path.GetFullPath(xml_modded);
 
-                                optLoading_from = config.GetValue("Optimize Loading", "GameFolder", string.Empty),
-                                optLoading_to = config.GetValue("Optimize Loading", "BackupFolder", string.Empty),
-                                optLoading_filelist = config.GetValue("Optimize Loading", "Files", string.Empty),
+                                        bool xml_modded_exist = File.Exists(xml_modded),
+                                            patcher_path_exist = File.Exists(patcher_path),
+                                            patcher_pathinfo_exist = Directory.Exists(patcher_pathinfo),
+                                            patcher_pathinfo_empty = patcher_pathinfo_exist ? Leayal.IO.DirectoryHelper.IsFolderEmpty(patcher_pathinfo) : true,
+                                            safetoswap = false;
+                                        string currenthash = null;
 
-                                patcher_path = config.GetValue("xml.dat patching", "patcher path", string.Empty),
-                                patcher_pathinfo = config.GetValue("xml.dat patching", "patch info folder", string.Empty),
-                                patcher_workingdir = config.GetValue("xml.dat patching", "working directory", string.Empty);
-                            List<string> filelist = null;
-
-                            SwapFileResult swapFileResult = null;
-
-                            if (keeprunning)
-                            {
-                                if (config.GetValue("Mods", "enable xml.dat swap", "0") != "0")
-                                    if (!string.IsNullOrWhiteSpace(xml_ori) && File.Exists(xml_ori))
-                                        if (!string.IsNullOrWhiteSpace(xml_modded))
-                                        {
-                                            xml_ori = Path.GetFullPath(xml_ori);
-                                            xml_modded = Path.GetFullPath(xml_modded);
-
-                                            bool xml_modded_exist = File.Exists(xml_modded),
-                                                patcher_path_exist = File.Exists(patcher_path),
-                                                patcher_pathinfo_exist = Directory.Exists(patcher_pathinfo),
-                                                patcher_pathinfo_empty = patcher_pathinfo_exist ? Leayal.IO.DirectoryHelper.IsFolderEmpty(patcher_pathinfo) : true,
-                                                safetoswap = false;
-                                            string currenthash = null;
-
-                                            if (!xml_modded_exist)
-                                                if (patcher_path_exist && patcher_pathinfo_exist && !patcher_pathinfo_empty)
+                                        if (autopatching && !xml_modded_exist)
+                                            if (patcher_path_exist && patcher_pathinfo_exist && !patcher_pathinfo_empty)
+                                            {
+                                                if (MessageBox.Show(this.GetWrapperForm(), "The modded xml.dat has not been created yet. Do you want to create it?", "Question", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
                                                 {
-                                                    if (MessageBox.Show(this.GetWrapperForm(), "The modded xml.dat has not been created yet. Do you want to create it?", "Question", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+                                                    using (Process patchingProc = new Process())
                                                     {
-                                                        using (Process patchingProc = new Process())
+                                                        patchingProc.StartInfo.FileName = patcher_path;
+                                                        List<string> paramList = new List<string>(5);
+                                                        paramList.Add("/p");
+                                                        paramList.Add(xml_ori);
+                                                        paramList.Add(patcher_pathinfo);
+                                                        paramList.Add("-o");
+                                                        paramList.Add(xml_modded);
+                                                        if (!string.IsNullOrWhiteSpace(patcher_workingdir))
                                                         {
-                                                            patchingProc.StartInfo.FileName = patcher_path;
-                                                            List<string> paramList = new List<string>(5);
-                                                            paramList.Add("-p");
-                                                            paramList.Add(xml_ori);
-                                                            paramList.Add(xml_modded);
-                                                            paramList.Add(patcher_pathinfo);
-                                                            if (!string.IsNullOrWhiteSpace(patcher_workingdir))
-                                                            {
-                                                                Microsoft.VisualBasic.FileIO.FileSystem.CreateDirectory(patcher_workingdir);
-                                                                paramList.Add(patcher_workingdir);
-                                                            }
-                                                            patchingProc.StartInfo.Arguments = ProcessHelper.TableStringToArgs(paramList);
+                                                            Microsoft.VisualBasic.FileIO.FileSystem.CreateDirectory(patcher_workingdir);
+                                                            paramList.Add(patcher_workingdir);
+                                                        }
+                                                        patchingProc.StartInfo.Arguments = ProcessHelper.TableStringToArgs(paramList);
 
-                                                            patchingProc.Start();
-                                                            patchingProc.WaitForExit();
-                                                            if (patchingProc.ExitCode == 0)
-                                                            {
-                                                                if (string.IsNullOrEmpty(currenthash))
-                                                                    currenthash = Leayal.Security.Cryptography.SHA256Wrapper.HashFromFile(xml_ori);
-                                                                config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
-                                                                safetoswap = true;
-                                                                xml_modded_exist = true;
-                                                            }
+                                                        patchingProc.Start();
+                                                        patchingProc.WaitForExit();
+                                                        if (patchingProc.ExitCode == 0)
+                                                        {
+                                                            if (string.IsNullOrEmpty(currenthash))
+                                                                currenthash = Leayal.Security.Cryptography.SHA256Wrapper.HashFromFile(xml_ori);
+                                                            config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
+                                                            safetoswap = true;
+                                                            xml_modded_exist = true;
                                                         }
                                                     }
                                                 }
+                                            }
 
-                                            if (xml_modded_exist)
+                                        if (xml_modded_exist)
+                                        {
+                                            if (swap_ignorewarning)
+                                                safetoswap = true;
+                                            else
                                             {
-                                                if (swap_ignorewarning)
+                                                if (string.IsNullOrEmpty(currenthash))
+                                                    currenthash = Leayal.Security.Cryptography.SHA256Wrapper.HashFromFile(xml_ori);
+                                                if (string.IsNullOrWhiteSpace(original_hash))
+                                                {
+                                                    config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
                                                     safetoswap = true;
+                                                }
                                                 else
                                                 {
-                                                    if (string.IsNullOrEmpty(currenthash))
-                                                        currenthash = Leayal.Security.Cryptography.SHA256Wrapper.HashFromFile(xml_ori);
-                                                    if (string.IsNullOrWhiteSpace(original_hash))
-                                                    {
-                                                        config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
+                                                    if (currenthash.IsEqual(original_hash, true))
                                                         safetoswap = true;
-                                                    }
                                                     else
                                                     {
-                                                        if (currenthash.IsEqual(original_hash, true))
-                                                            safetoswap = true;
-                                                        else
+                                                        // Throw warning and exit.
+                                                        this._wrapperform.Show();
+
+                                                        bool patchsuccess = false;
+                                                        if (autopatching && patcher_path_exist && patcher_pathinfo_exist && !patcher_pathinfo_empty)
                                                         {
-                                                            // Throw warning and exit.
-                                                            this._wrapperform.Show();
-
-                                                            bool patchsuccess = false;
-                                                            if (patcher_path_exist && patcher_pathinfo_exist && !patcher_pathinfo_empty)
+                                                            if (MessageBox.Show(this.GetWrapperForm(), "The original xml.dat has been changed. Do you want to patch it?", "Question", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
                                                             {
-                                                                if (MessageBox.Show(this.GetWrapperForm(), "The original xml.dat has been changed. Do you want to patch it?", "Question", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+                                                                using (Process patchingProc = new Process())
                                                                 {
-                                                                    using (Process patchingProc = new Process())
+                                                                    patchingProc.StartInfo.FileName = patcher_path;
+                                                                    List<string> paramList = new List<string>(5);
+                                                                    paramList.Add("-p");
+                                                                    paramList.Add(xml_ori);
+                                                                    paramList.Add(xml_modded);
+                                                                    paramList.Add(patcher_pathinfo);
+                                                                    if (!string.IsNullOrWhiteSpace(patcher_workingdir))
                                                                     {
-                                                                        patchingProc.StartInfo.FileName = patcher_path;
-                                                                        List<string> paramList = new List<string>(5);
-                                                                        paramList.Add("-p");
-                                                                        paramList.Add(xml_ori);
-                                                                        paramList.Add(xml_modded);
-                                                                        paramList.Add(patcher_pathinfo);
-                                                                        if (!string.IsNullOrWhiteSpace(patcher_workingdir))
-                                                                        {
-                                                                            Microsoft.VisualBasic.FileIO.FileSystem.CreateDirectory(patcher_workingdir);
-                                                                            paramList.Add(patcher_workingdir);
-                                                                        }
-                                                                        patchingProc.StartInfo.Arguments = ProcessHelper.TableStringToArgs(paramList);
+                                                                        Microsoft.VisualBasic.FileIO.FileSystem.CreateDirectory(patcher_workingdir);
+                                                                        paramList.Add(patcher_workingdir);
+                                                                    }
+                                                                    patchingProc.StartInfo.Arguments = ProcessHelper.TableStringToArgs(paramList);
 
-                                                                        patchingProc.Start();
-                                                                        patchingProc.WaitForExit();
-                                                                        if (patchingProc.ExitCode == 0)
-                                                                        {
-                                                                            config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
-                                                                            safetoswap = true;
-                                                                            patchsuccess = true;
-                                                                        }
+                                                                    patchingProc.Start();
+                                                                    patchingProc.WaitForExit();
+                                                                    if (patchingProc.ExitCode == 0)
+                                                                    {
+                                                                        config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
+                                                                        safetoswap = true;
+                                                                        patchsuccess = true;
                                                                     }
                                                                 }
                                                             }
+                                                        }
 
-                                                            if (!patchsuccess)
+                                                        if (!patchsuccess)
+                                                        {
+                                                            if (MessageBox.Show(this.GetWrapperForm(), "The original xml.dat has been changed. You should rebuild/update your modded xml.dat file, otherwise unexpected results may happen.\nIgnore hash check for current version and continue?", "Warning", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
                                                             {
-                                                                if (MessageBox.Show(this.GetWrapperForm(), "The original xml.dat has been changed. You should rebuild/update your modded xml.dat file, otherwise unexpected results may happen.\nIgnore hash check for current version and continue?", "Warning", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
-                                                                {
-                                                                    config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
-                                                                    safetoswap = true;
-                                                                }
-                                                                else
-                                                                    this.ExitProgram(1);
+                                                                config.SetValue("xml.dat swap", "original sha256 hash", currenthash);
+                                                                safetoswap = true;
                                                             }
+                                                            else
+                                                                this.ExitProgram(1);
                                                         }
                                                     }
                                                 }
-
-                                                if (safetoswap)
-                                                {
-                                                    swapFileResult = SwapFile(xml_ori, xml_modded, Path.ChangeExtension(xml_ori, ".original"));
-                                                    if (swapFileResult.Error == null)
-                                                        swapfile_swapped = true;
-                                                    else
-                                                    {
-                                                        this._wrapperform.Show();
-                                                        if (MessageBox.Show(this.GetWrapperForm(), "An error has been occured. Start game anyway???\nError detail: " + swapFileResult.Error.ToString(), "Error while swapping file.", MessageBoxButtons.YesNo, MessageBoxIcon.Error) != DialogResult.Yes)
-                                                            this.ExitProgram(2);
-                                                    }
-                                                }
                                             }
-                                        }
 
-                                if (optimizeLoading)
-                                {
-                                    if (!string.IsNullOrWhiteSpace(optLoading_from) && !string.IsNullOrWhiteSpace(optLoading_to) && !string.IsNullOrWhiteSpace(optLoading_filelist))
-                                    {
-                                        optLoading_from = Path.GetFullPath(optLoading_from);
-                                        optLoading_to = Path.GetFullPath(optLoading_to);
-
-                                        if (Directory.Exists(optLoading_from))
-                                        {
-                                            string[] files;
-                                            if (optLoading_filelist.IndexOf(';') > -1)
-                                                files = optLoading_filelist.Split(';');
-                                            else
-                                                files = new string[] { optLoading_filelist };
-
-                                            Microsoft.VisualBasic.FileIO.FileSystem.CreateDirectory(optLoading_to);
-
-                                            if (files.Length > 0)
+                                            if (safetoswap)
                                             {
-                                                filelist = new List<string>(files.Length);
-                                                string tmpstrFrom, tmpstrTo;
-                                                for (int i = 0; i < files.Length; i++)
+                                                swapFileResult = SwapFile(xml_ori, xml_modded, Path.ChangeExtension(xml_ori, ".original"));
+                                                if (swapFileResult.Error == null)
+                                                    swapfile_swapped = true;
+                                                else
                                                 {
-                                                    tmpstrFrom = Path.Combine(optLoading_from, files[i]);
-                                                    tmpstrTo = Path.Combine(optLoading_to, files[i] + ".bak");
-                                                    if (File.Exists(tmpstrFrom))
-                                                    {
-                                                        if (File.Exists(tmpstrTo))
-                                                            File.Delete(tmpstrTo);
-                                                        File.Move(tmpstrFrom, tmpstrTo);
-                                                        filelist.Add(files[i]);
-                                                    }
+                                                    this._wrapperform.Show();
+                                                    if (MessageBox.Show(this.GetWrapperForm(), "An error has been occured. Start game anyway???\nError detail: " + swapFileResult.Error.ToString(), "Error while swapping file.", MessageBoxButtons.YesNo, MessageBoxIcon.Error) != DialogResult.Yes)
+                                                        this.ExitProgram(2);
                                                 }
                                             }
                                         }
                                     }
-                                }
-                            }
 
-                            this._wrapperform.Hide();
-                            proc.Start();
-
-                            if (keeprunning)
+                            if (optimizeLoading)
                             {
-                                proc.WaitForExit();
-
-                                if (swapFileResult != null)
-                                    if (swapfile_swapped)
-                                    {
-                                        if (File.Exists(swapFileResult.BackupFilename))
-                                        {
-                                            if (File.Exists(swapFileResult.FilenameToSwap))
-                                                File.Delete(swapFileResult.FilenameToSwap);
-                                            if (File.Exists(swapFileResult.FilenameToBeSwapped))
-                                                File.Move(swapFileResult.FilenameToBeSwapped, swapFileResult.FilenameToSwap);
-
-                                            File.Move(swapFileResult.BackupFilename, swapFileResult.FilenameToBeSwapped);
-                                        }
-                                    }
-
-                                if (optimizeLoading)
+                                if (!string.IsNullOrWhiteSpace(optLoading_from) && !string.IsNullOrWhiteSpace(optLoading_to) && !string.IsNullOrWhiteSpace(optLoading_filelist))
                                 {
-                                    if (Directory.Exists(optLoading_to) && (filelist != null))
+                                    optLoading_from = Path.GetFullPath(optLoading_from);
+                                    optLoading_to = Path.GetFullPath(optLoading_to);
+
+                                    if (Directory.Exists(optLoading_from))
                                     {
-                                        string tmpstrFrom, tmpstrTo;
-                                        for (int i = 0; i < filelist.Count; i++)
+                                        string[] files;
+                                        if (optLoading_filelist.IndexOf(';') > -1)
+                                            files = optLoading_filelist.Split(';');
+                                        else
+                                            files = new string[] { optLoading_filelist };
+
+                                        Microsoft.VisualBasic.FileIO.FileSystem.CreateDirectory(optLoading_to);
+
+                                        if (files.Length > 0)
                                         {
-                                            tmpstrFrom = Path.Combine(optLoading_from, filelist[i]);
-                                            tmpstrTo = Path.Combine(optLoading_to, filelist[i] + ".bak");
-                                            if (File.Exists(tmpstrTo))
+                                            filelist = new List<string>(files.Length);
+                                            string tmpstrFrom, tmpstrTo;
+                                            for (int i = 0; i < files.Length; i++)
                                             {
+                                                tmpstrFrom = Path.Combine(optLoading_from, files[i]);
+                                                tmpstrTo = Path.Combine(optLoading_to, files[i] + ".bak");
                                                 if (File.Exists(tmpstrFrom))
-                                                    File.Delete(tmpstrFrom);
-                                                File.Move(tmpstrTo, tmpstrFrom);
+                                                {
+                                                    if (File.Exists(tmpstrTo))
+                                                        File.Delete(tmpstrTo);
+                                                    File.Move(tmpstrFrom, tmpstrTo);
+                                                    filelist.Add(files[i]);
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
                         }
-                        this.ExitProgram(0);
+
+                        this._wrapperform.Hide();
+
+                        if (keeprunning)
+                        {
+                            if (discord_enableRP && File.Exists("discord-rpc-x86.dll"))
+                            {
+                                if (!string.IsNullOrWhiteSpace(discord_clientID))
+                                {
+                                    this.handlers = new DiscordRPC.EventHandlers();
+                                    this.handlers.readyCallback = Discord_ReadyCallback;
+                                    this.handlers.disconnectedCallback = Discord_DisconnectedCallback;
+                                    this.handlers.errorCallback = Discord_ErrorCallback;
+
+                                    enableDiscordRP = true;
+                                    this.cacheRP = new DiscordRPC.RichPresence();
+                                    this.cacheRP.startTimestamp = DateTimeToTimestamp(DateTime.Now);
+
+                                    DiscordRPC.Initialize(discord_clientID, ref this.handlers, true, null);
+
+                                    DiscordRPC.RunCallbacks();
+
+                                    ThreadPool.QueueUserWorkItem(new WaitCallback(delegate
+                                    {
+                                        Thread.Sleep(1500);
+                                        this.UpdateRichPresence();
+
+                                        DiscordRPC.RunCallbacks();
+                                    }));
+                                }
+                            }
+                            
+                            gameProcess.EnableRaisingEvents = true;
+                            gameProcess.Exited += this.Proc_Exited;
+
+                            gameProcess.Start();
+
+                            return true;
+                        }
+                        else
+                        {
+                            gameProcess.Start();
+                            this.ExitProgram(0);
+                        }
                     }
                     else
                         this.ExitProgram(-1);
@@ -368,9 +382,103 @@ namespace BnSLaunchWrapper
                 return false;
             }
 
+            private void Proc_Exited(object sender, EventArgs e)
+            {
+                Application.Exit();
+            }
+
+            protected override void OnStartupNextInstance(StartupNextInstanceEventArgs eventArgs)
+            {
+                base.OnStartupNextInstance(eventArgs);
+                if (eventArgs.CommandLine.Contains("/u", StringComparer.OrdinalIgnoreCase) || eventArgs.CommandLine.Contains("--unstuck", StringComparer.OrdinalIgnoreCase))
+                {
+                    Application.Exit();
+                    return;
+                }
+                if (enableDiscordRP)
+                    this.UpdateRichPresence(eventArgs.CommandLine.Contains("/f", StringComparer.OrdinalIgnoreCase) || eventArgs.CommandLine.Contains("--force", StringComparer.OrdinalIgnoreCase));
+            }
+
+            private long DateTimeToTimestamp(DateTime dt)
+            {
+                return (dt.Ticks - 621355968000000000) / 10000000;
+            }
+
+            private void Discord_DisconnectedCallback(int errorCode, string message)
+            {
+
+            }
+
+            private void Discord_ErrorCallback(int errorCode, string message)
+            {
+
+            }
+
+            private void Discord_ReadyCallback()
+            {
+                this.UpdateRichPresence();
+            }
+
+            private void UpdateRichPresence()
+            {
+                this.UpdateRichPresence(false);
+            }
+
+            private void UpdateRichPresence(bool force)
+            {
+                var rpData = new Leayal.Ini.IniFile(Path.Combine(AppInfo.EntryAssemblyInfo.DirectoryPath, "Discord-RPC-Payload.ini"));
+                if (rpData.IsEmpty)
+                {
+                    rpData.SetValue("DiscordRichPresence", "State", "Playing Solo");
+                    rpData.SetValue("DiscordRichPresence", "Details", "Leveling up class");
+                    rpData.SetValue("DiscordRichPresence", "LargeImageKey", "Map-Name-Key");
+                    rpData.SetValue("DiscordRichPresence", "LargeImageText", "Map's name");
+                    rpData.SetValue("DiscordRichPresence", "SmallImageKey", "char-icon-key");
+                    rpData.SetValue("DiscordRichPresence", "SmallImageText", "CharacterName");
+
+                    rpData.SetValue("DiscordRichPresence", "PartySizeMax", "0");
+                    rpData.SetValue("DiscordRichPresence", "PartySizeCurrent", "0");
+                    rpData.Save(Encoding.UTF8);
+                }
+
+                if (!enableDiscordRP)
+                {
+                    rpData.Close();
+                    return;
+                }
+
+                this.cacheRP.state = rpData.GetValue("DiscordRichPresence", "State", "Playing Solo");
+                this.cacheRP.details = rpData.GetValue("DiscordRichPresence", "Details", "Leveling up class");
+                this.cacheRP.largeImageKey = rpData.GetValue("DiscordRichPresence", "LargeImageKey", "Map-Name-Key");
+                this.cacheRP.largeImageText = rpData.GetValue("DiscordRichPresence", "LargeImageText", "Map's name");
+                this.cacheRP.smallImageKey = rpData.GetValue("DiscordRichPresence", "SmallImageKey", "char-icon-key");
+                this.cacheRP.smallImageText = rpData.GetValue("DiscordRichPresence", "SmallImageText", "CharacterName");
+
+                string inString = rpData.GetValue("DiscordRichPresence", "PartySizeMax", "4");
+                int outNumber;
+                if (int.TryParse(inString, out outNumber))
+                    this.cacheRP.partyMax = outNumber;
+                else
+                    this.cacheRP.partyMax = 0;
+
+                inString = rpData.GetValue("DiscordRichPresence", "PartySizeCurrent", "1");
+                if (int.TryParse(inString, out outNumber))
+                    this.cacheRP.partySize = outNumber;
+                else
+                    this.cacheRP.partySize = 0;
+                rpData.Close();
+
+                DiscordRPC.UpdatePresence(ref this.cacheRP);
+                this.GetWrapperForm();
+
+                if (!force)
+                    this.MainForm.Hide();
+            }
+
             private WrapperForm _wrapperform;
             public WrapperForm GetWrapperForm()
             {
+                this._wrapperform.Show();
                 this._wrapperform.Activate();
                 FlashWindowEx(this._wrapperform);
                 return this._wrapperform;
@@ -410,15 +518,66 @@ namespace BnSLaunchWrapper
 
                 return new SwapFileResult(filetobeswapped, filetoswap, backupname);
             }
-            
-            private void ExitProgram(int code)
+
+            protected override void OnShutdown()
             {
+                this.CleanUp();
+                base.OnShutdown();
+            }
+
+            private void CleanUp()
+            {
+                if (this.gameProcess != null)
+                    this.gameProcess.Dispose();
+                if (enableDiscordRP)
+                    DiscordRPC.Shutdown();
+                if (keeprunning)
+                {
+                    if (swapFileResult != null)
+                        if (swapfile_swapped)
+                        {
+                            if (File.Exists(swapFileResult.BackupFilename))
+                            {
+                                if (File.Exists(swapFileResult.FilenameToSwap))
+                                    File.Delete(swapFileResult.FilenameToSwap);
+                                if (File.Exists(swapFileResult.FilenameToBeSwapped))
+                                    File.Move(swapFileResult.FilenameToBeSwapped, swapFileResult.FilenameToSwap);
+
+                                File.Move(swapFileResult.BackupFilename, swapFileResult.FilenameToBeSwapped);
+                            }
+                        }
+
+                    if (optimizeLoading)
+                    {
+                        if (Directory.Exists(optLoading_to) && (filelist != null))
+                        {
+                            string tmpstrFrom, tmpstrTo;
+                            for (int i = 0; i < filelist.Count; i++)
+                            {
+                                tmpstrFrom = Path.Combine(optLoading_from, filelist[i]);
+                                tmpstrTo = Path.Combine(optLoading_to, filelist[i] + ".bak");
+                                if (File.Exists(tmpstrTo))
+                                {
+                                    if (File.Exists(tmpstrFrom))
+                                        File.Delete(tmpstrFrom);
+                                    File.Move(tmpstrTo, tmpstrFrom);
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (config != null)
                     config.Save();
                 if (this.MainForm != null)
                     this.MainForm.Dispose();
                 // System.Environment.ExitCode = code;
                 // System.Windows.Forms.Application.Exit();
+            }
+
+            private void ExitProgram(int code)
+            {
+                this.CleanUp();
                 System.Environment.Exit(code);
             }
 

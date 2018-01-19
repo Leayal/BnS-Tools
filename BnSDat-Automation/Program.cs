@@ -59,17 +59,42 @@ namespace BnSDat_Automation
                     MyProgressMenu myProgressMenu = new MyProgressMenu();
                     if (myProgressMenu != null)
                     {
-                        if (args[1].IsEqual("-p", true))
+                        if (args[1].IsEqual("/p", true))
                             myProgressMenu.Operation = Operation.Patch;
-                        else if (args[1].IsEqual("-c", true))
+                        else if (args[1].IsEqual("/c", true))
                             myProgressMenu.Operation = Operation.Compress;
-                        else if (args[1].IsEqual("-e", true))
+                        else if (args[1].IsEqual("/e", true))
                             myProgressMenu.Operation = Operation.Extract;
+
+                        List<string> orphanArgs = new List<string>(5);
+
+                        string switch_o = null,
+                            switch_tmp = null;
+
+                        for (int i = 2; i < args.Length; i++)
+                        {
+                            if (args[i].IsEqual("-o", true))
+                            {
+                                if ((i + 1) < args.Length)
+                                    switch_o = args[++i];
+                            }
+                            if (args[i].IsEqual("-temp", true))
+                            {
+                                if ((i + 1) < args.Length)
+                                    switch_tmp = args[++i];
+                            }
+                            else if (args[i].IsEqual("-64", true))
+                            {
+                                myProgressMenu.Is64 = true;
+                            }
+                            else
+                                orphanArgs.Add(args[i]);
+                        }
 
                         switch (myProgressMenu.Operation)
                         {
                             case Operation.Patch:
-                                if (args.Length < 5)
+                                if (orphanArgs.Count < 2)
                                 {
                                     this.MainForm = myProgressMenu;
                                     this.ShowUsageHint();
@@ -77,15 +102,20 @@ namespace BnSDat_Automation
                                 }
                                 else
                                 {
-                                    myProgressMenu.OriginalXML = args[2];
-                                    myProgressMenu.OutputXML = args[3];
-                                    myProgressMenu.DirectoryOfPatchcingInfo = args[4];
-                                    if (args.Length >= 6 && Directory.Exists(args[5]))
-                                        myProgressMenu.TemporaryFolder = args[5];
+                                    myProgressMenu.OriginalXML = orphanArgs[0];
+                                    myProgressMenu.DirectoryOfPatchcingInfo = orphanArgs[1];
+
+                                    if (!string.IsNullOrWhiteSpace(switch_o) && !Directory.Exists(switch_o))
+                                        myProgressMenu.OutputXML = switch_o;
+                                    else
+                                        myProgressMenu.OutputXML = myProgressMenu.OriginalXML + ".modded";
+
+                                    if (!string.IsNullOrWhiteSpace(switch_tmp) && Directory.Exists(switch_tmp))
+                                        myProgressMenu.TemporaryFolder = switch_tmp;
                                 }
                                 break;
                             case Operation.Extract:
-                                if (args.Length < 4)
+                                if (orphanArgs.Count < 1)
                                 {
                                     this.MainForm = myProgressMenu;
                                     this.ShowUsageHint();
@@ -93,12 +123,24 @@ namespace BnSDat_Automation
                                 }
                                 else
                                 {
-                                    myProgressMenu.OriginalXML = args[2];
-                                    myProgressMenu.OutputXML = args[3];
+                                    myProgressMenu.OriginalXML = orphanArgs[0];
+                                    if (!string.IsNullOrWhiteSpace(switch_o) && !File.Exists(switch_o))
+                                    {
+                                        myProgressMenu.OutputXML = switch_o;
+                                    }
+                                    else
+                                    {
+                                        string outputPath = myProgressMenu.OriginalXML + ".files";
+                                        if (File.Exists(outputPath))
+                                            outputPath = myProgressMenu.OriginalXML + ".datafiles";
+                                        if (File.Exists(outputPath))
+                                            outputPath = myProgressMenu.OriginalXML + $".{DateTime.Now.ToBinary().ToString()}" + ".files";
+                                        myProgressMenu.OutputXML = outputPath;
+                                    }
                                 }
                                 break;
                             case Operation.Compress:
-                                if (args.Length < 4)
+                                if (orphanArgs.Count < 2)
                                 {
                                     this.MainForm = myProgressMenu;
                                     this.ShowUsageHint();
@@ -106,10 +148,10 @@ namespace BnSDat_Automation
                                 }
                                 else
                                 {
-                                    myProgressMenu.OriginalXML = args[2];
-                                    myProgressMenu.DirectoryOfPatchcingInfo = args[3];
-                                    if (args.Length >= 5 && Directory.Exists(args[4]))
-                                        myProgressMenu.TemporaryFolder = args[4];
+                                    myProgressMenu.OriginalXML = orphanArgs[0];
+                                    myProgressMenu.DirectoryOfPatchcingInfo = orphanArgs[1];
+                                    if (!string.IsNullOrWhiteSpace(switch_tmp) && Directory.Exists(switch_tmp))
+                                        myProgressMenu.TemporaryFolder = switch_tmp;
                                 }
                                 break;
                             default:

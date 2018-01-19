@@ -30,6 +30,7 @@ namespace BnSDat_Automation
         {
             this.InitializeComponent();
             this.Operation = Operation.None;
+            this.Is64 = false;
         }
 
         protected override void OnLoad(EventArgs e)
@@ -260,6 +261,7 @@ namespace BnSDat_Automation
                 throw new InvalidEnumArgumentException();
         }
 
+        public bool Is64 { get; set; }
         public string TemporaryFolder { get; set; }
         public string OriginalXML { get; set; }
         public string OutputXML { get; set; }
