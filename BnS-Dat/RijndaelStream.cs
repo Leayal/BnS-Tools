@@ -9,7 +9,8 @@ namespace BnSDat
 {
     class RijndaelStream : Stream
     {
-        public const string AES_KEY = "bns_obt_kr_2014#";
+        //public const string AES_KEY = "bns_obt_kr_2014#";
+        public const string AES_KEY = "ja#n_2@020_compl";
         public readonly static byte[] RAW_AES_KEY = Encoding.ASCII.GetBytes(AES_KEY);
 
         public Stream BaseStream { get; }
